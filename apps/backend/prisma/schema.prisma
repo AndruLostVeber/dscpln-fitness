@@ -57,11 +57,14 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  profile  UserProfile?
-  sessions Session[]
+  profile         UserProfile?
+  sessions        Session[]
+  workoutSessions WorkoutSession[]
+  chatMessages    ChatMessage[]
 
   @@map("users")
 }
+
 
 model UserProfile {
   id              String          @id @default(uuid())
@@ -93,4 +96,46 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
+}
+
+model WorkoutSession {
+  id          String            @id @default(uuid())
+  userId      String
+  title       String
+  durationMin Int
+  notes       String?
+  createdAt   DateTime          @default(now())
+
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercises WorkoutExercise[]
+
+  @@map("workout_sessions")
+}
+
+model WorkoutExercise {
+  id          String  @id @default(uuid())
+  sessionId   String
+  name        String
+  sets        Int
+  reps        Int?
+  weightKg    Float?
+  durationSec Int?
+  notes       String?
+
+  session WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("workout_exercises")
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  userId    String
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("chat_messages")
 }
