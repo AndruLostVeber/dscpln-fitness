@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum FitnessGoal {
+  lose_weight
+  gain_muscle
+  maintain
+  improve_endurance
+  flexibility
+}
+
+enum FitnessLevel {
+  beginner
+  intermediate
+  advanced
+}
+
+enum MotivationStyle {
+  light
+  medium
+  hard
+}
+
+enum ActivityLevel {
+  sedentary
+  lightly_active
+  moderately_active
+  very_active
+}
+
+enum DietPreference {
+  omnivore
+  vegetarian
+  vegan
+  keto
+  none
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String?
+  googleId     String?  @unique
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profile  UserProfile?
+  sessions Session[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id              String          @id @default(uuid())
+  userId          String          @unique
+  dateOfBirth     DateTime
+  gender          Gender
+  heightCm        Int
+  weightKg        Float
+  goal            FitnessGoal
+  fitnessLevel    FitnessLevel
+  motivationStyle MotivationStyle
+  activityLevel   ActivityLevel?
+  workoutsPerWeek Int?
+  injuries        String[]
+  dietPreference  DietPreference?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}

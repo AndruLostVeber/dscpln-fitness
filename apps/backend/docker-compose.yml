@@ -1,0 +1,25 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fitness_ai_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fitness_ai
+      POSTGRES_USER: fitness_user
+      POSTGRES_PASSWORD: fitness_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: fitness_ai_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
