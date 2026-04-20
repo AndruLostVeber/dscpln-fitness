@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react'
 import { api, clearTokens } from './api/client'
 import Auth from './pages/Auth'
-import Chat from './pages/Chat'
-import Workouts from './pages/Workouts'
-import Plan from './pages/Plan'
+import Dashboard from './pages/Dashboard'
+import Food from './pages/Food'
+import WorkoutToday from './pages/WorkoutToday'
+import Settings from './pages/Settings'
 
-type Page = 'chat' | 'workouts' | 'plan'
+type Page = 'dashboard' | 'food' | 'workout' | 'settings'
 
 export default function App() {
   const [user, setUser] = useState<any>(null)
-  const [page, setPage] = useState<Page>('chat')
+  const [page, setPage] = useState<Page>('dashboard')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -26,41 +27,44 @@ export default function App() {
     setUser(null)
   }
 
-  if (loading) return <div style={{ padding: 40 }}>Загрузка...</div>
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f7f8fa' }}>
+      <div style={{ color: '#aaa' }}>Загрузка...</div>
+    </div>
+  )
+
   if (!user) return <Auth onAuth={() => api.auth.me().then(setUser)} />
 
-  const NAV: { key: Page; label: string }[] = [
-    { key: 'chat', label: 'Тренер' },
-    { key: 'workouts', label: 'Тренировки' },
-    { key: 'plan', label: 'План' },
-  ]
-
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: 20, fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid #ccc', paddingBottom: 12 }}>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {NAV.map(n => (
-            <button key={n.key} onClick={() => setPage(n.key)} style={{
-              padding: '6px 14px',
-              background: page === n.key ? '#007bff' : 'transparent',
-              color: page === n.key ? '#fff' : '#000',
-              border: '1px solid #ccc',
-              cursor: 'pointer',
-              borderRadius: 4,
-            }}>
-              {n.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ fontSize: 13, color: '#555' }}>
-          {user.name}
-          <button onClick={logout} style={{ marginLeft: 12, fontSize: 12, cursor: 'pointer' }}>Выйти</button>
-        </div>
-      </div>
+    <div style={{ maxWidth: 480, margin: '0 auto', fontFamily: 'system-ui, sans-serif', position: 'relative' }}>
+      {page === 'dashboard' && <Dashboard user={user} onNavigate={setPage} />}
+      {page === 'food' && <Food user={user} onBack={() => setPage('dashboard')} />}
+      {page === 'workout' && <WorkoutToday onBack={() => setPage('dashboard')} />}
+      {page === 'settings' && (
+        <Settings
+          user={user}
+          onBack={() => setPage('dashboard')}
+          onUserUpdate={setUser}
+          onLogout={logout}
+        />
+      )}
 
-      {page === 'chat' && <Chat />}
-      {page === 'workouts' && <Workouts />}
-      {page === 'plan' && <Plan />}
+      {page === 'dashboard' && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+          width: '100%', maxWidth: 480,
+          background: '#fff', borderTop: '1px solid #eee',
+          padding: '8px 16px 12px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <button onClick={() => setPage('settings')} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 8px' }}>
+            ⚙️
+          </button>
+          <button onClick={logout} style={{ background: 'none', border: 'none', fontSize: 13, color: '#aaa', cursor: 'pointer' }}>
+            Выйти
+          </button>
+        </div>
+      )}
     </div>
   )
 }

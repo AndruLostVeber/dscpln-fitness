@@ -1,5 +1,6 @@
 import { nvidia, NVIDIA_MODELS } from '../../lib/nvidia'
 import { prisma } from '../../plugins/prisma'
+import type { FoodSuggestionsInput, WorkoutSuggestionsInput } from './ai-coach.schemas'
 
 const HISTORY_LIMIT = 20
 
@@ -156,5 +157,114 @@ ${notes ? `- Пожелания: ${notes}` : ''}
       take: 50,
       select: { id: true, role: true, content: true, createdAt: true },
     })
+  },
+
+  async getMotivation(userId: string): Promise<string> {
+    const user = await prisma.user.findUnique({ where: { id: userId }, include: { profile: true } })
+    if (!user?.profile) throw Object.assign(new Error('Profile not found'), { statusCode: 400 })
+
+    const styleMap: Record<string, string> = {
+      light: 'Ты дружелюбный тренер. Скажи короткую мотивирующую фразу на сегодня.',
+      medium: 'Ты строгий тренер. Скажи короткую требовательную фразу-напоминание на сегодня.',
+      hard: 'Ты жёсткий тренер-сержант. Скажи короткую агрессивную фразу с матом, чтобы заставить тренироваться.',
+    }
+
+    const completion = await nvidia.chat.completions.create({
+      model: NVIDIA_MODELS.chat,
+      messages: [
+        { role: 'system', content: styleMap[user.profile.motivationStyle] },
+        { role: 'user', content: `Клиент: ${user.name}, цель: ${user.profile.goal}. Одна фраза, максимум 2 предложения.` },
+      ],
+      temperature: 0.9,
+      max_tokens: 100,
+    })
+
+    return completion.choices[0].message.content ?? ''
+  },
+
+  async getFoodSuggestions(userId: string, input: FoodSuggestionsInput): Promise<object> {
+    const user = await prisma.user.findUnique({ where: { id: userId }, include: { profile: true } })
+    if (!user?.profile) throw Object.assign(new Error('Profile not found'), { statusCode: 400 })
+
+    const eatenLine = input.eatenItems.length > 0
+      ? `Сегодня уже съел: ${input.eatenItems.join(', ')}.`
+      : 'Сегодня ещё ничего не ел.'
+
+    const prompt = `Ты диетолог. Составь 10 вариантов блюд для человека.
+
+${eatenLine}
+Желаемый ингредиент: "${input.want}" — ВСЕ блюда обязаны его содержать как основной ингредиент.
+
+Остаток КБЖУ на сегодня:
+- Калории: ${Math.round(input.remainingCalories)} ккал
+- Белки: ${Math.round(input.remainingProtein)}г
+- Жиры: ${Math.round(input.remainingFat)}г
+- Углеводы: ${Math.round(input.remainingCarbs)}г
+
+Каждое блюдо должно укладываться в этот остаток или незначительно его превышать (не более чем на 15%). Учитывай что человек цель: ${user.profile.goal}. Блюда должны быть разными по способу приготовления.
+
+Ответь ТОЛЬКО валидным JSON без markdown:
+{
+  "suggestions": [
+    {
+      "name": "Название блюда",
+      "description": "Способ приготовления, 1 предложение",
+      "calories": 400,
+      "protein": 30,
+      "fat": 10,
+      "carbs": 45
+    }
+  ]
+}`
+
+    const completion = await nvidia.chat.completions.create({
+      model: NVIDIA_MODELS.chat,
+      messages: [
+        { role: 'system', content: 'Ты диетолог. Отвечай только валидным JSON.' },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.5,
+      max_tokens: 2500,
+    })
+
+    const raw = completion.choices[0].message.content ?? '{}'
+    return JSON.parse(raw.replace(/```json|```/g, '').trim())
+  },
+
+  async getWorkoutSuggestions(userId: string, focus: string): Promise<object> {
+    const user = await prisma.user.findUnique({ where: { id: userId }, include: { profile: true } })
+    if (!user?.profile) throw Object.assign(new Error('Profile not found'), { statusCode: 400 })
+
+    const prompt = `Составь 2 варианта тренировки на сегодня.
+Фокус: ${focus}.
+Уровень: ${user.profile.fitnessLevel}, цель: ${user.profile.goal}.
+Травмы: ${user.profile.injuries.length > 0 ? user.profile.injuries.join(', ') : 'нет'}.
+
+Ответь ТОЛЬКО валидным JSON без markdown:
+{
+  "workouts": [
+    {
+      "title": "Название варианта",
+      "duration": "45 мин",
+      "difficulty": "средняя",
+      "exercises": [
+        { "name": "Упражнение", "sets": 4, "reps": "10-12", "rest": "60 сек" }
+      ]
+    }
+  ]
+}`
+
+    const completion = await nvidia.chat.completions.create({
+      model: NVIDIA_MODELS.chat,
+      messages: [
+        { role: 'system', content: 'Ты опытный фитнес-тренер. Отвечай только валидным JSON.' },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.5,
+      max_tokens: 1500,
+    })
+
+    const raw = completion.choices[0].message.content ?? '{}'
+    return JSON.parse(raw.replace(/```json|```/g, '').trim())
   },
 }

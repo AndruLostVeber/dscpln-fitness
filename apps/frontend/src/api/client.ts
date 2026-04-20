@@ -43,6 +43,10 @@ export const api = {
     chat: (message: string) => request<{ response: string }>('/ai/chat', { method: 'POST', body: JSON.stringify({ message }) }),
     history: () => request<any[]>('/ai/history'),
     workoutPlan: (notes?: string) => request<any>('/ai/workout-plan', { method: 'POST', body: JSON.stringify({ notes }) }),
+    motivation: () => request<{ message: string }>('/ai/motivation'),
+    foodSuggestions: (body: { want: string; eatenItems: string[]; remainingCalories: number; remainingProtein: number; remainingFat: number; remainingCarbs: number }) =>
+      request<any>('/ai/food-suggestions', { method: 'POST', body: JSON.stringify(body) }),
+    workoutSuggestions: (focus: string) => request<any>('/ai/workout-suggestions', { method: 'POST', body: JSON.stringify({ focus }) }),
   },
   workouts: {
     log: (body: object) => request<any>('/workouts', { method: 'POST', body: JSON.stringify(body) }),

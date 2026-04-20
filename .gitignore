@@ -9,7 +9,6 @@ build/
 *.log
 server.log
 
-prisma/migrations/
 
 *.pem
 *.key

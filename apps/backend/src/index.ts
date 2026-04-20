@@ -1,4 +1,5 @@
 import Fastify from 'fastify'
+import cors from '@fastify/cors'
 import { ZodError } from 'zod'
 import { authRoutes } from './modules/auth/auth.routes'
 import { aiCoachRoutes } from './modules/ai-coach/ai-coach.routes'
@@ -6,6 +7,8 @@ import { workoutsRoutes } from './modules/workouts/workouts.routes'
 import { connectRedis } from './plugins/redis'
 
 const app = Fastify({ logger: true })
+
+app.register(cors, { origin: 'http://localhost:5173' })
 
 app.setErrorHandler((error, _request, reply) => {
   if (error instanceof ZodError) {
