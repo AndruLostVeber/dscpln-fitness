@@ -1,94 +1,48 @@
 import { useState } from 'react'
-import { api, clearTokens } from '../api/client'
+import { ChevronLeft, X, Check, ChevronRight } from 'lucide-react'
+import { api } from '../api/client'
 
-interface Props {
-  user: any
-  onBack: () => void
-  onUserUpdate: (user: any) => void
-  onLogout: () => void
+const C = { bg: '#0D0D0F', card: '#16161A', card2: '#1E1E26', border: '#2A2A35', orange: '#FF6B35', orangeGlow: 'rgba(255,107,53,0.12)', white: '#FFFFFF', gray: '#8E8EA0', gray2: '#404050', red: '#FF4757' }
+
+interface Props { user: any; onBack: () => void; onUserUpdate: (user: any) => void; onLogout: () => void }
+
+const GOALS = [{ value: 'lose_weight', label: 'Похудение', icon: '🔥' }, { value: 'gain_muscle', label: 'Набор мышц', icon: '💪' }, { value: 'maintain', label: 'Поддержание', icon: '⚖️' }, { value: 'improve_endurance', label: 'Выносливость', icon: '🏃' }, { value: 'flexibility', label: 'Гибкость', icon: '🧘' }]
+const LEVELS = [{ value: 'beginner', label: 'Новичок', desc: 'Только начинаю' }, { value: 'intermediate', label: 'Средний', desc: 'Тренируюсь регулярно' }, { value: 'advanced', label: 'Продвинутый', desc: 'Серьёзный опыт' }]
+const STYLES = [{ value: 'light', label: 'Мягкий', desc: 'Поддержка и мотивация', icon: '😊' }, { value: 'medium', label: 'Строгий', desc: 'Требователен, но справедлив', icon: '😤' }, { value: 'hard', label: 'Жёсткий', desc: 'Армейский стиль, без жалости', icon: '🔥' }]
+const ACTIVITIES = [{ value: 'sedentary', label: 'Сидячий образ жизни' }, { value: 'lightly_active', label: 'Слабая активность' }, { value: 'moderately_active', label: 'Умеренная активность' }, { value: 'very_active', label: 'Высокая активность' }]
+const DIETS = [{ value: 'omnivore', label: 'Всеядный' }, { value: 'vegetarian', label: 'Вегетарианец' }, { value: 'vegan', label: 'Веган' }, { value: 'keto', label: 'Кето' }, { value: 'none', label: 'Без ограничений' }]
+
+function Row({ label, value, onClick }: { label: string; value: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: 'none', textAlign: 'left', borderBottom: `1px solid ${C.border}` }}>
+      <span style={{ fontSize: 15, color: C.white }}>{label}</span>
+      <span style={{ fontSize: 14, color: C.orange, display: 'flex', alignItems: 'center', gap: 4 }}>{value} <ChevronRight size={16} /></span>
+    </button>
+  )
 }
 
-const GOALS = [
-  { value: 'lose_weight', label: 'Похудение' },
-  { value: 'gain_muscle', label: 'Набор мышц' },
-  { value: 'maintain', label: 'Поддержание' },
-  { value: 'improve_endurance', label: 'Выносливость' },
-  { value: 'flexibility', label: 'Гибкость' },
-]
-const LEVELS = [
-  { value: 'beginner', label: 'Новичок' },
-  { value: 'intermediate', label: 'Средний' },
-  { value: 'advanced', label: 'Продвинутый' },
-]
-const STYLES = [
-  { value: 'light', label: 'Мягкий', desc: 'Подбадривание' },
-  { value: 'medium', label: 'Строгий', desc: 'Требователен' },
-  { value: 'hard', label: 'Жёсткий', desc: 'Без жалости' },
-]
-const ACTIVITIES = [
-  { value: 'sedentary', label: 'Сидячий образ жизни' },
-  { value: 'lightly_active', label: 'Слабая активность' },
-  { value: 'moderately_active', label: 'Умеренная активность' },
-  { value: 'very_active', label: 'Высокая активность' },
-]
-const DIETS = [
-  { value: 'omnivore', label: 'Всеядный' },
-  { value: 'vegetarian', label: 'Вегетарианец' },
-  { value: 'vegan', label: 'Веган' },
-  { value: 'keto', label: 'Кето' },
-  { value: 'none', label: 'Без ограничений' },
-]
-
-type Section = 'body' | 'goals' | 'trainer' | 'account'
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid #f0f0f0' }}>
-      <div style={{ fontSize: 15, color: '#222' }}>{label}</div>
-      <div style={{ color: '#007bff', fontSize: 15 }}>{children}</div>
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 11, color: C.gray, textTransform: 'uppercase', letterSpacing: 1.2, margin: '20px 4px 10px' }}>{title}</div>
+      <div style={{ background: C.card, borderRadius: 18, overflow: 'hidden', border: `1px solid ${C.border}` }}>{children}</div>
     </div>
   )
 }
 
-function Card({ children }: { children: React.ReactNode }) {
+function BottomSheet({ title, onClose, onSave, saving, children }: { title: string; onClose: () => void; onSave: () => void; saving: boolean; children: React.ReactNode }) {
   return (
-    <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', marginBottom: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-      {children}
-    </div>
-  )
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ fontSize: 12, color: '#aaa', textTransform: 'uppercase', letterSpacing: 0.8, margin: '20px 4px 8px' }}>
-      {children}
-    </div>
-  )
-}
-
-interface EditModalProps {
-  title: string
-  onClose: () => void
-  onSave: () => void
-  saving: boolean
-  children: React.ReactNode
-}
-
-function EditModal({ title, onClose, onSave, saving, children }: EditModalProps) {
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div style={{ background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: 24, maxHeight: '85vh', overflowY: 'auto' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }} onClick={onClose}>
+      <div style={{ background: C.card, borderRadius: '24px 24px 0 0', width: '100%', maxWidth: 480, margin: '0 auto', padding: '20px 20px 32px', maxHeight: '85vh', overflowY: 'auto', border: `1px solid ${C.border}` }} onClick={e => e.stopPropagation()}>
+        <div style={{ width: 40, height: 4, background: C.border, borderRadius: 2, margin: '0 auto 20px' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <div style={{ fontSize: 17, fontWeight: 700 }}>{title}</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, color: '#aaa', cursor: 'pointer', padding: 0 }}>✕</button>
+          <div style={{ fontSize: 18, fontWeight: 800, color: C.white }}>{title}</div>
+          <button onClick={onClose} style={{ color: C.gray, padding: 0, display: 'flex', alignItems: 'center' }}>
+            <X size={22} />
+          </button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {children}
-        </div>
-        <button
-          onClick={onSave}
-          disabled={saving}
-          style={{ marginTop: 20, width: '100%', padding: 14, background: '#007bff', color: '#fff', border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{children}</div>
+        <button onClick={onSave} disabled={saving} style={{ marginTop: 20, width: '100%', padding: 16, background: C.orange, color: '#fff', borderRadius: 16, fontSize: 16, fontWeight: 700 }}>
           {saving ? 'Сохранение...' : 'Сохранить'}
         </button>
       </div>
@@ -96,11 +50,27 @@ function EditModal({ title, onClose, onSave, saving, children }: EditModalProps)
   )
 }
 
+function OptionBtn({ label, desc, icon, selected, onClick }: { label: string; desc?: string; icon?: string; selected: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{ width: '100%', padding: '13px 16px', borderRadius: 14, textAlign: 'left', background: selected ? C.orangeGlow : C.card2, border: `2px solid ${selected ? C.orange : C.border}`, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+      {icon && <span style={{ fontSize: 20 }}>{icon}</span>}
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: selected ? C.orange : C.white }}>{label}</div>
+        {desc && <div style={{ fontSize: 12, color: C.gray, marginTop: 2 }}>{desc}</div>}
+      </div>
+      {selected && (
+        <div style={{ width: 20, height: 20, borderRadius: 10, background: C.orange, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+          <Check size={12} />
+        </div>
+      )}
+    </button>
+  )
+}
+
 export default function Settings({ user, onBack, onUserUpdate, onLogout }: Props) {
   const p = user.profile ?? {}
   const [editing, setEditing] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
 
   const [weight, setWeight] = useState(String(p.weightKg ?? ''))
   const [height, setHeight] = useState(String(p.heightCm ?? ''))
@@ -113,161 +83,110 @@ export default function Settings({ user, onBack, onUserUpdate, onLogout }: Props
   const [injuries, setInjuries] = useState((p.injuries ?? []).join(', '))
   const [name, setName] = useState(user.name ?? '')
 
+  const labelOf = (arr: { value: string; label: string }[], val: string) => arr.find(x => x.value === val)?.label ?? val
+
   async function save(fields: object) {
-    setError('')
     setSaving(true)
-    try {
-      await api.auth.updateProfile(fields)
-      const updated = await api.auth.me()
-      onUserUpdate(updated)
-      setEditing(null)
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setSaving(false)
-    }
+    try { await api.auth.updateProfile(fields); const updated = await api.auth.me(); onUserUpdate(updated); setEditing(null) }
+    finally { setSaving(false) }
   }
 
-  const labelOf = (arr: { value: string; label: string }[], val: string) =>
-    arr.find(x => x.value === val)?.label ?? val
-
   return (
-    <div style={{ minHeight: '100vh', background: '#f7f8fa', paddingBottom: 40 }}>
-      <div style={{ padding: '20px 16px 12px', background: '#fff', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: 0 }}>←</button>
-        <div style={{ fontSize: 18, fontWeight: 700 }}>Настройки</div>
+    <div style={{ minHeight: '100vh', background: C.bg, paddingBottom: 40 }}>
+      <div style={{ padding: '52px 20px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+        <button onClick={onBack} style={{ width: 36, height: 36, borderRadius: 10, background: C.card2, color: C.white, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <ChevronLeft size={20} />
+        </button>
+        <div style={{ fontSize: 20, fontWeight: 800, color: C.white }}>Настройки</div>
       </div>
 
       <div style={{ padding: '0 16px' }}>
+        <div style={{ background: C.card, borderRadius: 20, padding: '16px 20px', marginBottom: 16, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ width: 52, height: 52, borderRadius: 26, background: C.orange, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800, color: '#fff' }}>
+            {user.name?.[0]?.toUpperCase() ?? '?'}
+          </div>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: C.white }}>{user.name}</div>
+            <div style={{ fontSize: 13, color: C.gray }}>{user.email}</div>
+          </div>
+        </div>
 
-        <SectionTitle>Тело</SectionTitle>
-        <Card>
-          <Row label="Вес"><button onClick={() => setEditing('weight')} style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', fontSize: 15 }}>{p.weightKg} кг ›</button></Row>
-          <Row label="Рост"><button onClick={() => setEditing('height')} style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', fontSize: 15 }}>{p.heightCm} см ›</button></Row>
-        </Card>
+        <SectionCard title="Тело">
+          <Row label="Вес" value={`${p.weightKg} кг`} onClick={() => setEditing('weight')} />
+          <Row label="Рост" value={`${p.heightCm} см`} onClick={() => setEditing('height')} />
+        </SectionCard>
 
-        <SectionTitle>Фитнес</SectionTitle>
-        <Card>
-          <Row label="Цель"><button onClick={() => setEditing('goal')} style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', fontSize: 15 }}>{labelOf(GOALS, goal)} ›</button></Row>
-          <Row label="Уровень"><button onClick={() => setEditing('level')} style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', fontSize: 15 }}>{labelOf(LEVELS, level)} ›</button></Row>
-          <Row label="Активность"><button onClick={() => setEditing('activity')} style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', fontSize: 15 }}>{labelOf(ACTIVITIES, activity)} ›</button></Row>
-          <Row label="Тренировок в неделю"><button onClick={() => setEditing('workouts')} style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', fontSize: 15 }}>{workoutsPerWeek} ›</button></Row>
-          <Row label="Травмы"><button onClick={() => setEditing('injuries')} style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', fontSize: 15 }}>{injuries || 'нет'} ›</button></Row>
-        </Card>
+        <SectionCard title="Фитнес">
+          <Row label="Цель" value={labelOf(GOALS, goal)} onClick={() => setEditing('goal')} />
+          <Row label="Уровень" value={labelOf(LEVELS, level)} onClick={() => setEditing('level')} />
+          <Row label="Активность" value={labelOf(ACTIVITIES, activity)} onClick={() => setEditing('activity')} />
+          <Row label="Тренировок в неделю" value={workoutsPerWeek} onClick={() => setEditing('workouts')} />
+          <Row label="Травмы" value={injuries || 'нет'} onClick={() => setEditing('injuries')} />
+        </SectionCard>
 
-        <SectionTitle>Питание</SectionTitle>
-        <Card>
-          <Row label="Тип питания"><button onClick={() => setEditing('diet')} style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', fontSize: 15 }}>{labelOf(DIETS, diet)} ›</button></Row>
-        </Card>
+        <SectionCard title="Питание">
+          <Row label="Тип питания" value={labelOf(DIETS, diet)} onClick={() => setEditing('diet')} />
+        </SectionCard>
 
-        <SectionTitle>Тренер</SectionTitle>
-        <Card>
-          <Row label="Стиль тренера"><button onClick={() => setEditing('style')} style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', fontSize: 15 }}>{labelOf(STYLES, style)} ›</button></Row>
-        </Card>
+        <SectionCard title="Тренер">
+          <Row label="Стиль" value={labelOf(STYLES, style)} onClick={() => setEditing('style')} />
+        </SectionCard>
 
-        <SectionTitle>Аккаунт</SectionTitle>
-        <Card>
-          <Row label="Имя"><button onClick={() => setEditing('name')} style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', fontSize: 15 }}>{user.name} ›</button></Row>
-          <Row label="Email"><span style={{ color: '#aaa', fontSize: 14 }}>{user.email}</span></Row>
-        </Card>
+        <SectionCard title="Аккаунт">
+          <Row label="Имя" value={user.name} onClick={() => setEditing('name')} />
+          <div style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 15, color: C.white }}>Email</span>
+            <span style={{ fontSize: 14, color: C.gray }}>{user.email}</span>
+          </div>
+        </SectionCard>
 
-        {error && <div style={{ color: 'red', fontSize: 13, margin: '8px 0' }}>{error}</div>}
-
-        <button
-          onClick={onLogout}
-          style={{ width: '100%', marginTop: 8, padding: 14, background: '#fff', color: '#ff4444', border: '1px solid #ffd0d0', borderRadius: 12, fontSize: 15, cursor: 'pointer' }}>
+        <button onClick={onLogout} style={{ width: '100%', marginTop: 8, padding: 16, background: 'rgba(255,71,87,0.1)', color: C.red, border: `1px solid rgba(255,71,87,0.3)`, borderRadius: 16, fontSize: 15, fontWeight: 600 }}>
           Выйти из аккаунта
         </button>
       </div>
 
       {editing === 'weight' && (
-        <EditModal title="Вес" onClose={() => setEditing(null)} onSave={() => save({ weightKg: Number(weight) })} saving={saving}>
-          <label style={{ fontSize: 14, color: '#555' }}>Вес (кг)</label>
-          <input type="number" value={weight} onChange={e => setWeight(e.target.value)} style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid #ddd', fontSize: 16 }} />
-        </EditModal>
+        <BottomSheet title="Вес" onClose={() => setEditing(null)} onSave={() => save({ weightKg: Number(weight) })} saving={saving}>
+          <div style={{ background: C.card2, borderRadius: 16, padding: '16px 20px', border: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: 11, color: C.gray, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Вес (кг)</div>
+            <input type="number" value={weight} onChange={e => setWeight(e.target.value)} style={{ width: '100%', background: 'none', border: 'none', fontSize: 36, fontWeight: 900, color: C.white, padding: 0 }} />
+          </div>
+        </BottomSheet>
       )}
-
       {editing === 'height' && (
-        <EditModal title="Рост" onClose={() => setEditing(null)} onSave={() => save({ heightCm: Number(height) })} saving={saving}>
-          <label style={{ fontSize: 14, color: '#555' }}>Рост (см)</label>
-          <input type="number" value={height} onChange={e => setHeight(e.target.value)} style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid #ddd', fontSize: 16 }} />
-        </EditModal>
+        <BottomSheet title="Рост" onClose={() => setEditing(null)} onSave={() => save({ heightCm: Number(height) })} saving={saving}>
+          <div style={{ background: C.card2, borderRadius: 16, padding: '16px 20px', border: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: 11, color: C.gray, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Рост (см)</div>
+            <input type="number" value={height} onChange={e => setHeight(e.target.value)} style={{ width: '100%', background: 'none', border: 'none', fontSize: 36, fontWeight: 900, color: C.white, padding: 0 }} />
+          </div>
+        </BottomSheet>
       )}
-
-      {editing === 'goal' && (
-        <EditModal title="Цель" onClose={() => setEditing(null)} onSave={() => save({ goal })} saving={saving}>
-          {GOALS.map(g => (
-            <button key={g.value} onClick={() => setGoal(g.value)} style={{ padding: '13px 16px', borderRadius: 10, border: `2px solid ${goal === g.value ? '#007bff' : '#eee'}`, background: goal === g.value ? '#f0f6ff' : '#fff', fontSize: 15, cursor: 'pointer', textAlign: 'left', fontWeight: goal === g.value ? 600 : 400 }}>
-              {g.label}
-            </button>
-          ))}
-        </EditModal>
-      )}
-
-      {editing === 'level' && (
-        <EditModal title="Уровень подготовки" onClose={() => setEditing(null)} onSave={() => save({ fitnessLevel: level })} saving={saving}>
-          {LEVELS.map(l => (
-            <button key={l.value} onClick={() => setLevel(l.value)} style={{ padding: '13px 16px', borderRadius: 10, border: `2px solid ${level === l.value ? '#007bff' : '#eee'}`, background: level === l.value ? '#f0f6ff' : '#fff', fontSize: 15, cursor: 'pointer', textAlign: 'left', fontWeight: level === l.value ? 600 : 400 }}>
-              {l.label}
-            </button>
-          ))}
-        </EditModal>
-      )}
-
-      {editing === 'style' && (
-        <EditModal title="Стиль тренера" onClose={() => setEditing(null)} onSave={() => save({ motivationStyle: style })} saving={saving}>
-          {STYLES.map(s => (
-            <button key={s.value} onClick={() => setStyle(s.value)} style={{ padding: '13px 16px', borderRadius: 10, border: `2px solid ${style === s.value ? '#007bff' : '#eee'}`, background: style === s.value ? '#f0f6ff' : '#fff', fontSize: 15, cursor: 'pointer', textAlign: 'left', fontWeight: style === s.value ? 600 : 400 }}>
-              <div>{s.label}</div>
-              <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{s.desc}</div>
-            </button>
-          ))}
-        </EditModal>
-      )}
-
-      {editing === 'activity' && (
-        <EditModal title="Активность" onClose={() => setEditing(null)} onSave={() => save({ activityLevel: activity })} saving={saving}>
-          {ACTIVITIES.map(a => (
-            <button key={a.value} onClick={() => setActivity(a.value)} style={{ padding: '13px 16px', borderRadius: 10, border: `2px solid ${activity === a.value ? '#007bff' : '#eee'}`, background: activity === a.value ? '#f0f6ff' : '#fff', fontSize: 15, cursor: 'pointer', textAlign: 'left', fontWeight: activity === a.value ? 600 : 400 }}>
-              {a.label}
-            </button>
-          ))}
-        </EditModal>
-      )}
-
+      {editing === 'goal' && <BottomSheet title="Цель" onClose={() => setEditing(null)} onSave={() => save({ goal })} saving={saving}>{GOALS.map(g => <OptionBtn key={g.value} label={g.label} icon={g.icon} selected={goal === g.value} onClick={() => setGoal(g.value)} />)}</BottomSheet>}
+      {editing === 'level' && <BottomSheet title="Уровень" onClose={() => setEditing(null)} onSave={() => save({ fitnessLevel: level })} saving={saving}>{LEVELS.map(l => <OptionBtn key={l.value} label={l.label} desc={l.desc} selected={level === l.value} onClick={() => setLevel(l.value)} />)}</BottomSheet>}
+      {editing === 'style' && <BottomSheet title="Стиль тренера" onClose={() => setEditing(null)} onSave={() => save({ motivationStyle: style })} saving={saving}>{STYLES.map(s => <OptionBtn key={s.value} label={s.label} desc={s.desc} icon={s.icon} selected={style === s.value} onClick={() => setStyle(s.value)} />)}</BottomSheet>}
+      {editing === 'activity' && <BottomSheet title="Активность" onClose={() => setEditing(null)} onSave={() => save({ activityLevel: activity })} saving={saving}>{ACTIVITIES.map(a => <OptionBtn key={a.value} label={a.label} selected={activity === a.value} onClick={() => setActivity(a.value)} />)}</BottomSheet>}
+      {editing === 'diet' && <BottomSheet title="Тип питания" onClose={() => setEditing(null)} onSave={() => save({ dietPreference: diet })} saving={saving}>{DIETS.map(d => <OptionBtn key={d.value} label={d.label} selected={diet === d.value} onClick={() => setDiet(d.value)} />)}</BottomSheet>}
       {editing === 'workouts' && (
-        <EditModal title="Тренировок в неделю" onClose={() => setEditing(null)} onSave={() => save({ workoutsPerWeek: Number(workoutsPerWeek) })} saving={saving}>
+        <BottomSheet title="Тренировок в неделю" onClose={() => setEditing(null)} onSave={() => save({ workoutsPerWeek: Number(workoutsPerWeek) })} saving={saving}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
             {[1,2,3,4,5,6,7].map(n => (
-              <button key={n} onClick={() => setWorkoutsPerWeek(String(n))} style={{ padding: '12px 0', borderRadius: 10, border: `2px solid ${workoutsPerWeek === String(n) ? '#007bff' : '#eee'}`, background: workoutsPerWeek === String(n) ? '#f0f6ff' : '#fff', fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>
+              <button key={n} onClick={() => setWorkoutsPerWeek(String(n))} style={{ padding: '14px 0', borderRadius: 12, border: `2px solid ${workoutsPerWeek === String(n) ? C.orange : C.border}`, background: workoutsPerWeek === String(n) ? C.orangeGlow : C.card2, fontSize: 18, fontWeight: 800, color: workoutsPerWeek === String(n) ? C.orange : C.white }}>
                 {n}
               </button>
             ))}
           </div>
-        </EditModal>
+        </BottomSheet>
       )}
-
-      {editing === 'diet' && (
-        <EditModal title="Тип питания" onClose={() => setEditing(null)} onSave={() => save({ dietPreference: diet })} saving={saving}>
-          {DIETS.map(d => (
-            <button key={d.value} onClick={() => setDiet(d.value)} style={{ padding: '13px 16px', borderRadius: 10, border: `2px solid ${diet === d.value ? '#007bff' : '#eee'}`, background: diet === d.value ? '#f0f6ff' : '#fff', fontSize: 15, cursor: 'pointer', textAlign: 'left', fontWeight: diet === d.value ? 600 : 400 }}>
-              {d.label}
-            </button>
-          ))}
-        </EditModal>
-      )}
-
       {editing === 'injuries' && (
-        <EditModal title="Травмы / ограничения" onClose={() => setEditing(null)} onSave={() => save({ injuries: injuries.split(',').map(s => s.trim()).filter(Boolean) })} saving={saving}>
-          <label style={{ fontSize: 14, color: '#555' }}>Через запятую (или оставь пустым)</label>
-          <input value={injuries} onChange={e => setInjuries(e.target.value)} placeholder="колено, поясница..." style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid #ddd', fontSize: 15 }} />
-        </EditModal>
+        <BottomSheet title="Травмы / ограничения" onClose={() => setEditing(null)} onSave={() => save({ injuries: injuries.split(',').map((s: string) => s.trim()).filter(Boolean) })} saving={saving}>
+          <div style={{ fontSize: 13, color: C.gray, marginBottom: 4 }}>Через запятую (или оставь пустым)</div>
+          <input value={injuries} onChange={e => setInjuries(e.target.value)} placeholder="колено, поясница..." style={{ background: C.card2, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px 16px', fontSize: 15, color: C.white, width: '100%' }} />
+        </BottomSheet>
       )}
-
       {editing === 'name' && (
-        <EditModal title="Имя" onClose={() => setEditing(null)} onSave={async () => { setError(''); setSaving(true); try { await api.auth.updateProfile({ name } as any); const u = await api.auth.me(); onUserUpdate(u); setEditing(null) } catch(e:any){setError(e.message)} finally{setSaving(false)} }} saving={saving}>
-          <input value={name} onChange={e => setName(e.target.value)} style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid #ddd', fontSize: 16 }} />
-        </EditModal>
+        <BottomSheet title="Имя" onClose={() => setEditing(null)} onSave={async () => { setSaving(true); try { await api.auth.updateProfile({ name } as any); const u = await api.auth.me(); onUserUpdate(u); setEditing(null) } finally { setSaving(false) } }} saving={saving}>
+          <input value={name} onChange={e => setName(e.target.value)} style={{ background: C.card2, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px 16px', fontSize: 18, color: C.white, fontWeight: 700, width: '100%' }} />
+        </BottomSheet>
       )}
     </div>
   )

@@ -6,11 +6,15 @@
     <title>Fitness AI</title>
     <style>
       *, *::before, *::after { box-sizing: border-box; }
-      body { margin: 0; font-family: system-ui, sans-serif; }
-      input, select, button, textarea { font: inherit; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; }
-      button { cursor: pointer; background: #f0f0f0; }
-      button:disabled { opacity: 0.5; cursor: not-allowed; }
-      input:focus, select:focus { outline: 2px solid #007bff; border-color: #007bff; }
+      body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif; background: #0D0D0F; color: #fff; }
+      input, select, textarea { font: inherit; background: #1E1E26; color: #fff; border: 1px solid #2A2A35; border-radius: 12px; padding: 12px 14px; outline: none; }
+      input::placeholder, textarea::placeholder { color: #404050; }
+      input:focus, select:focus, textarea:focus { border-color: #FF6B35; }
+      button { font: inherit; cursor: pointer; border: none; background: none; }
+      button:disabled { opacity: 0.4; cursor: not-allowed; }
+      ::-webkit-scrollbar { width: 0; }
+      * { -webkit-tap-highlight-color: transparent; }
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
   </head>
   <body>

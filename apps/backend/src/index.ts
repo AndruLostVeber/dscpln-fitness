@@ -8,7 +8,7 @@ import { connectRedis } from './plugins/redis'
 
 const app = Fastify({ logger: true })
 
-app.register(cors, { origin: 'http://localhost:5173' })
+app.register(cors, { origin: ['http://localhost:5173', 'http://localhost:5174'] })
 
 app.setErrorHandler((error, _request, reply) => {
   if (error instanceof ZodError) {

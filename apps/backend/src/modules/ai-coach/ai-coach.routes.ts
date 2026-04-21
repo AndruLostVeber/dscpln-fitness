@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { requireAuth } from '../../lib/auth.middleware'
 import { AiCoachService } from './ai-coach.service'
-import { ChatSchema, WorkoutPlanSchema, FoodSuggestionsSchema, WorkoutSuggestionsSchema } from './ai-coach.schemas'
+import { ChatSchema, WorkoutPlanSchema, FoodSuggestionsSchema, WorkoutSuggestionsSchema, MotivationSchema } from './ai-coach.schemas'
 
 export async function aiCoachRoutes(app: FastifyInstance) {
   app.post('/chat', { preHandler: [requireAuth] }, async (request, reply) => {
@@ -21,8 +21,9 @@ export async function aiCoachRoutes(app: FastifyInstance) {
     return reply.code(200).send(history)
   })
 
-  app.get('/motivation', { preHandler: [requireAuth] }, async (request, reply) => {
-    const message = await AiCoachService.getMotivation((request as any).user.id)
+  app.post('/motivation', { preHandler: [requireAuth] }, async (request, reply) => {
+    const context = MotivationSchema.parse(request.body)
+    const message = await AiCoachService.getMotivation((request as any).user.id, context)
     return reply.code(200).send({ message })
   })
 
@@ -33,8 +34,8 @@ export async function aiCoachRoutes(app: FastifyInstance) {
   })
 
   app.post('/workout-suggestions', { preHandler: [requireAuth] }, async (request, reply) => {
-    const { focus } = WorkoutSuggestionsSchema.parse(request.body)
-    const result = await AiCoachService.getWorkoutSuggestions((request as any).user.id, focus)
+    const input = WorkoutSuggestionsSchema.parse(request.body)
+    const result = await AiCoachService.getWorkoutSuggestions((request as any).user.id, input)
     return reply.code(200).send(result)
   })
 }

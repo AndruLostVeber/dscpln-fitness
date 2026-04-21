@@ -7,4 +7,5 @@ export const nvidia = new OpenAI({
 
 export const NVIDIA_MODELS = {
   chat: 'meta/llama-3.3-70b-instruct',
+  fast: 'meta/llama-3.1-8b-instruct',
 } as const

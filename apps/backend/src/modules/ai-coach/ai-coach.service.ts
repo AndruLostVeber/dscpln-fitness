@@ -1,6 +1,6 @@
 import { nvidia, NVIDIA_MODELS } from '../../lib/nvidia'
 import { prisma } from '../../plugins/prisma'
-import type { FoodSuggestionsInput, WorkoutSuggestionsInput } from './ai-coach.schemas'
+import type { FoodSuggestionsInput, WorkoutSuggestionsInput, MotivationInput } from './ai-coach.schemas'
 
 const HISTORY_LIMIT = 20
 
@@ -159,27 +159,54 @@ ${notes ? `- Пожелания: ${notes}` : ''}
     })
   },
 
-  async getMotivation(userId: string): Promise<string> {
+  async getMotivation(userId: string, ctx: MotivationInput): Promise<string> {
     const user = await prisma.user.findUnique({ where: { id: userId }, include: { profile: true } })
     if (!user?.profile) throw Object.assign(new Error('Profile not found'), { statusCode: 400 })
 
+    const p = user.profile
     const styleMap: Record<string, string> = {
-      light: 'Ты дружелюбный тренер. Скажи короткую мотивирующую фразу на сегодня.',
-      medium: 'Ты строгий тренер. Скажи короткую требовательную фразу-напоминание на сегодня.',
-      hard: 'Ты жёсткий тренер-сержант. Скажи короткую агрессивную фразу с матом, чтобы заставить тренироваться.',
+      light: 'Ты дружелюбный и поддерживающий тренер. Говори тепло и позитивно.',
+      medium: 'Ты строгий, но справедливый тренер. Говори прямо и требовательно.',
+      hard: 'Ты жёсткий тренер-сержант. Говори грубо, с матом, без жалости.',
     }
 
+    const calPct = ctx.targetCalories > 0 ? Math.round((ctx.consumedCalories / ctx.targetCalories) * 100) : 0
+    const proteinPct = ctx.targetProtein > 0 ? Math.round((ctx.consumedProtein / ctx.targetProtein) * 100) : 0
+    const calorieStatus = calPct === 0
+      ? 'ещё ничего не ел сегодня'
+      : calPct < 50 ? `съел мало — ${ctx.consumedCalories} из ${ctx.targetCalories} ккал (${calPct}%)`
+      : calPct < 90 ? `съел ${ctx.consumedCalories} из ${ctx.targetCalories} ккал (${calPct}%)`
+      : calPct < 110 ? `отлично закрыл норму — ${ctx.consumedCalories} из ${ctx.targetCalories} ккал`
+      : `перебрал калории — ${ctx.consumedCalories} из ${ctx.targetCalories} ккал (${calPct}%)`
+
+    const workoutStatus = ctx.workoutsThisWeek === 0
+      ? 'на этой неделе ещё не тренировался'
+      : ctx.lastWorkoutDaysAgo === 0 ? `тренировался сегодня (всего ${ctx.workoutsThisWeek} на неделе)`
+      : ctx.lastWorkoutDaysAgo === 1 ? `последняя тренировка вчера (всего ${ctx.workoutsThisWeek} на неделе)`
+      : `последняя тренировка ${ctx.lastWorkoutDaysAgo} дней назад (всего ${ctx.workoutsThisWeek} на неделе)`
+
+    const goalMap: Record<string, string> = {
+      lose_weight: 'похудение', gain_muscle: 'набор мышц',
+      maintain: 'поддержание формы', improve_endurance: 'выносливость', flexibility: 'гибкость',
+    }
+
+    const prompt = `Клиент: ${user.name}, цель: ${goalMap[p.goal] ?? p.goal}, вес: ${p.weightKg} кг.
+Питание сегодня: ${calorieStatus}. Белок: ${ctx.consumedProtein}г из ${ctx.targetProtein}г (${proteinPct}%).
+Тренировки: ${workoutStatus}.
+
+Дай ОДИН конкретный персональный совет на основе этих данных — что улучшить прямо сейчас. Максимум 2 предложения. Без приветствий.`
+
     const completion = await nvidia.chat.completions.create({
-      model: NVIDIA_MODELS.chat,
+      model: NVIDIA_MODELS.fast,
       messages: [
-        { role: 'system', content: styleMap[user.profile.motivationStyle] },
-        { role: 'user', content: `Клиент: ${user.name}, цель: ${user.profile.goal}. Одна фраза, максимум 2 предложения.` },
+        { role: 'system', content: styleMap[p.motivationStyle] + ' Отвечай только на русском.' },
+        { role: 'user', content: prompt },
       ],
-      temperature: 0.9,
-      max_tokens: 100,
+      temperature: 0.7,
+      max_tokens: 120,
     })
 
-    return completion.choices[0].message.content ?? ''
+    return completion.choices[0].message.content?.trim() ?? ''
   },
 
   async getFoodSuggestions(userId: string, input: FoodSuggestionsInput): Promise<object> {
@@ -190,35 +217,11 @@ ${notes ? `- Пожелания: ${notes}` : ''}
       ? `Сегодня уже съел: ${input.eatenItems.join(', ')}.`
       : 'Сегодня ещё ничего не ел.'
 
-    const prompt = `Ты диетолог. Составь 10 вариантов блюд для человека.
-
-${eatenLine}
-Желаемый ингредиент: "${input.want}" — ВСЕ блюда обязаны его содержать как основной ингредиент.
-
-Остаток КБЖУ на сегодня:
-- Калории: ${Math.round(input.remainingCalories)} ккал
-- Белки: ${Math.round(input.remainingProtein)}г
-- Жиры: ${Math.round(input.remainingFat)}г
-- Углеводы: ${Math.round(input.remainingCarbs)}г
-
-Каждое блюдо должно укладываться в этот остаток или незначительно его превышать (не более чем на 15%). Учитывай что человек цель: ${user.profile.goal}. Блюда должны быть разными по способу приготовления.
-
-Ответь ТОЛЬКО валидным JSON без markdown:
-{
-  "suggestions": [
-    {
-      "name": "Название блюда",
-      "description": "Способ приготовления, 1 предложение",
-      "calories": 400,
-      "protein": 30,
-      "fat": 10,
-      "carbs": 45
-    }
-  ]
-}`
+    const prompt = `3 блюда с "${input.want}". ${eatenLine} КБЖУ: ${Math.round(input.remainingCalories)}ккал Б${Math.round(input.remainingProtein)} Ж${Math.round(input.remainingFat)} У${Math.round(input.remainingCarbs)}. Цель: ${user.profile.goal}.
+JSON:{"suggestions":[{"name":"...","description":"1 предложение","calories":0,"protein":0,"fat":0,"carbs":0,"ingredients":["кол-во ингредиент (пояснение)"],"recipe":["Шаг (X мин): детальные действия"]}]}`
 
     const completion = await nvidia.chat.completions.create({
-      model: NVIDIA_MODELS.chat,
+      model: NVIDIA_MODELS.fast,
       messages: [
         { role: 'system', content: 'Ты диетолог. Отвечай только валидным JSON.' },
         { role: 'user', content: prompt },
@@ -231,31 +234,18 @@ ${eatenLine}
     return JSON.parse(raw.replace(/```json|```/g, '').trim())
   },
 
-  async getWorkoutSuggestions(userId: string, focus: string): Promise<object> {
+  async getWorkoutSuggestions(userId: string, input: WorkoutSuggestionsInput): Promise<object> {
     const user = await prisma.user.findUnique({ where: { id: userId }, include: { profile: true } })
     if (!user?.profile) throw Object.assign(new Error('Profile not found'), { statusCode: 400 })
 
-    const prompt = `Составь 2 варианта тренировки на сегодня.
-Фокус: ${focus}.
-Уровень: ${user.profile.fitnessLevel}, цель: ${user.profile.goal}.
-Травмы: ${user.profile.injuries.length > 0 ? user.profile.injuries.join(', ') : 'нет'}.
+    const exCount = input.exerciseCount ?? 5
+    const sets = input.setsPerExercise ?? 3
 
-Ответь ТОЛЬКО валидным JSON без markdown:
-{
-  "workouts": [
-    {
-      "title": "Название варианта",
-      "duration": "45 мин",
-      "difficulty": "средняя",
-      "exercises": [
-        { "name": "Упражнение", "sets": 4, "reps": "10-12", "rest": "60 сек" }
-      ]
-    }
-  ]
-}`
+    const prompt = `2 варианта тренировки. Мышцы: ${input.focus}. Уровень: ${user.profile.fitnessLevel}, цель: ${user.profile.goal}. Травмы: ${user.profile.injuries.join(', ') || 'нет'}. Ровно ${exCount} упражнений, ${sets} подходов в каждом. JSON без markdown:
+{"workouts":[{"title":"...","duration":"X мин","difficulty":"...","exercises":[{"name":"...","sets":${sets},"reps":"10-12"}]}]}`
 
     const completion = await nvidia.chat.completions.create({
-      model: NVIDIA_MODELS.chat,
+      model: NVIDIA_MODELS.fast,
       messages: [
         { role: 'system', content: 'Ты опытный фитнес-тренер. Отвечай только валидным JSON.' },
         { role: 'user', content: prompt },
