@@ -1,10 +1,50 @@
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
-import { randomUUID } from 'crypto'
+import crypto, { randomUUID } from 'crypto'
 import { OAuth2Client } from 'google-auth-library'
 import { prisma } from '../../plugins/prisma'
 import { redis } from '../../plugins/redis'
 import type { RegisterInput, LoginInput, UpdateProfileInput } from './auth.schemas'
+
+interface TelegramUser {
+  id: number
+  first_name: string
+  last_name?: string
+  username?: string
+  photo_url?: string
+  language_code?: string
+}
+
+function validateTelegramInitData(initData: string): TelegramUser | null {
+  try {
+    const params = new URLSearchParams(initData)
+    const hash = params.get('hash')
+    if (!hash) return null
+    params.delete('hash')
+
+    const dataCheckString = [...params.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${v}`)
+      .join('\n')
+
+    const secretKey = crypto
+      .createHmac('sha256', 'WebAppData')
+      .update(process.env.TELEGRAM_BOT_TOKEN!)
+      .digest()
+    const expectedHash = crypto
+      .createHmac('sha256', secretKey)
+      .update(dataCheckString)
+      .digest('hex')
+
+    if (expectedHash !== hash) return null
+
+    const userStr = params.get('user')
+    if (!userStr) return null
+    return JSON.parse(userStr) as TelegramUser
+  } catch {
+    return null
+  }
+}
 
 const BCRYPT_ROUNDS = 12
 const ACCESS_TOKEN_TTL = '15m'
@@ -32,6 +72,8 @@ function userPublicFields() {
     id: true,
     email: true,
     name: true,
+    avatarUrl: true,
+    telegramId: true,
     createdAt: true,
     profile: true,
   } as const
@@ -123,6 +165,43 @@ export const AuthService = {
       })
     }
 
+    const accessToken = signAccessToken(user.id)
+    const refreshToken = await createSession(user.id)
+    return { accessToken, refreshToken, user, isNewUser }
+  },
+
+  async telegramAuth(initData: string) {
+    const tgUser = validateTelegramInitData(initData)
+    if (!tgUser) {
+      throw Object.assign(new Error('Invalid Telegram data'), { statusCode: 401 })
+    }
+
+    const telegramId = String(tgUser.id)
+    const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ')
+
+    let user = await prisma.user.findUnique({
+      where: { telegramId },
+      select: userPublicFields(),
+    })
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          telegramId,
+          name: fullName,
+          avatarUrl: tgUser.photo_url ?? null,
+        },
+        select: userPublicFields(),
+      })
+    } else if (tgUser.photo_url && user.avatarUrl !== tgUser.photo_url) {
+      user = await prisma.user.update({
+        where: { telegramId },
+        data: { avatarUrl: tgUser.photo_url },
+        select: userPublicFields(),
+      })
+    }
+
+    const isNewUser = !user.profile
     const accessToken = signAccessToken(user.id)
     const refreshToken = await createSession(user.id)
     return { accessToken, refreshToken, user, isNewUser }

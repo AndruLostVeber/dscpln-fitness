@@ -3,18 +3,25 @@ import { ChevronLeft, Check, Zap, Rocket, ChevronRight } from 'lucide-react'
 import { api, saveTokens } from '../api/client'
 
 const C = {
-  bg: '#0D0D0F',
-  card: '#16161A',
-  card2: '#1E1E26',
-  border: '#2A2A35',
-  orange: '#FF6B35',
-  orangeGlow: 'rgba(255,107,53,0.15)',
-  white: '#FFFFFF',
-  gray: '#8E8EA0',
-  gray2: '#404050',
+  bg: '#0D0D0F', card: '#16161A', card2: '#1E1E26',
+  border: '#2A2A35', orange: '#FF6B35', orangeGlow: 'rgba(255,107,53,0.15)',
+  white: '#FFFFFF', gray: '#8E8EA0', gray2: '#404050',
 }
 
-interface Props { onAuth: () => void }
+interface TgUser {
+  id?: number
+  first_name?: string
+  last_name?: string
+  username?: string
+  photo_url?: string
+}
+
+interface Props {
+  onAuth: () => void
+  isTelegram?: boolean
+  tgUser?: TgUser
+  preAuthed?: boolean  // уже есть JWT, нужен только профиль
+}
 
 const GOALS = [
   { value: 'lose_weight', label: 'Похудение', icon: '🔥' },
@@ -40,7 +47,10 @@ const GENDERS = [
 ]
 
 type Step = 'credentials' | 'name' | 'dob' | 'gender' | 'body' | 'goal' | 'level' | 'style'
-const STEPS: Step[] = ['credentials', 'name', 'dob', 'gender', 'body', 'goal', 'level', 'style']
+
+const WEB_STEPS: Step[] = ['credentials', 'name', 'dob', 'gender', 'body', 'goal', 'level', 'style']
+const TG_STEPS: Step[]  = ['name', 'dob', 'gender', 'body', 'goal', 'level', 'style']
+
 const STEP_TITLES: Record<Step, string> = {
   credentials: 'Создайте аккаунт',
   name: 'Как вас зовут?',
@@ -55,9 +65,7 @@ const STEP_TITLES: Record<Step, string> = {
 function Input({ placeholder, type = 'text', value, onChange }: { placeholder: string; type?: string; value: string; onChange: (v: string) => void }) {
   return (
     <input
-      type={type}
-      placeholder={placeholder}
-      value={value}
+      type={type} placeholder={placeholder} value={value}
       onChange={e => onChange(e.target.value)}
       style={{ width: '100%', padding: '14px 16px', background: C.card2, border: `1px solid ${C.border}`, borderRadius: 14, fontSize: 15, color: C.white }}
     />
@@ -86,13 +94,19 @@ function OptionBtn({ label, desc, icon, selected, onClick }: { label: string; de
   )
 }
 
-export default function Auth({ onAuth }: Props) {
+export default function Auth({ onAuth, isTelegram, tgUser, preAuthed }: Props) {
+  const STEPS = isTelegram ? TG_STEPS : WEB_STEPS
+
   const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [step, setStep] = useState<Step>('credentials')
+  const [step, setStep] = useState<Step>(STEPS[0])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const tgName = [tgUser?.first_name, tgUser?.last_name].filter(Boolean).join(' ')
+
   const [form, setForm] = useState({
-    email: '', password: '', confirmPassword: '', name: '',
+    email: '', password: '', confirmPassword: '',
+    name: isTelegram ? tgName : '',
     dateOfBirth: '', gender: 'male', heightCm: '', weightKg: '',
     goal: '', fitnessLevel: '', motivationStyle: '',
   })
@@ -125,7 +139,7 @@ export default function Auth({ onAuth }: Props) {
     setError('')
     const idx = STEPS.indexOf(step)
     if (idx < STEPS.length - 1) setStep(STEPS[idx + 1])
-    else submitRegister()
+    else submit()
   }
 
   function back() {
@@ -136,8 +150,7 @@ export default function Auth({ onAuth }: Props) {
 
   async function submitLogin(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
-    setLoading(true)
+    setError(''); setLoading(true)
     try {
       const res = await api.auth.login({ email: form.email, password: form.password })
       saveTokens(res.accessToken, res.refreshToken)
@@ -146,22 +159,37 @@ export default function Auth({ onAuth }: Props) {
     finally { setLoading(false) }
   }
 
-  async function submitRegister() {
-    setError('')
-    setLoading(true)
+  async function submit() {
+    setError(''); setLoading(true)
     try {
-      const res = await api.auth.register({
-        email: form.email, password: form.password, name: form.name,
-        dateOfBirth: form.dateOfBirth, gender: form.gender,
-        heightCm: Number(form.heightCm), weightKg: Number(form.weightKg),
-        goal: form.goal, fitnessLevel: form.fitnessLevel, motivationStyle: form.motivationStyle,
-      })
-      saveTokens(res.accessToken, res.refreshToken)
-      onAuth()
+      const profileData = {
+        dateOfBirth: form.dateOfBirth,
+        gender: form.gender,
+        heightCm: Number(form.heightCm),
+        weightKg: Number(form.weightKg),
+        goal: form.goal,
+        fitnessLevel: form.fitnessLevel,
+        motivationStyle: form.motivationStyle,
+      }
+
+      if (isTelegram && preAuthed) {
+        // Уже авторизованы через TG — просто сохраняем профиль
+        await api.auth.updateProfile(profileData)
+        onAuth()
+      } else {
+        // Веб-регистрация
+        const res = await api.auth.register({
+          email: form.email, password: form.password, name: form.name,
+          ...profileData,
+        })
+        saveTokens(res.accessToken, res.refreshToken)
+        onAuth()
+      }
     } catch (e: any) { setError(e.message); setLoading(false) }
   }
 
-  if (mode === 'login') {
+  // ─── Логин (только для веба) ───────────────────────────────────────────────
+  if (!isTelegram && mode === 'login') {
     return (
       <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 24px' }}>
         <div style={{ width: '100%', maxWidth: 400 }}>
@@ -172,19 +200,14 @@ export default function Auth({ onAuth }: Props) {
             <div style={{ fontSize: 28, fontWeight: 800, color: C.white }}>Fitness AI</div>
             <div style={{ fontSize: 14, color: C.gray, marginTop: 6 }}>Твой персональный тренер</div>
           </div>
-
           <form onSubmit={submitLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Input placeholder="Email" type="email" value={form.email} onChange={v => set('email', v)} />
             <Input placeholder="Пароль" type="password" value={form.password} onChange={v => set('password', v)} />
             {error && <div style={{ color: '#FF4757', fontSize: 13, textAlign: 'center' }}>{error}</div>}
-            <button type="submit" disabled={loading} style={{
-              marginTop: 8, padding: '16px', background: C.orange, color: '#fff',
-              borderRadius: 16, fontSize: 16, fontWeight: 700,
-            }}>
+            <button type="submit" disabled={loading} style={{ marginTop: 8, padding: '16px', background: C.orange, color: '#fff', borderRadius: 16, fontSize: 16, fontWeight: 700 }}>
               {loading ? 'Вход...' : 'Войти'}
             </button>
           </form>
-
           <button onClick={() => { setMode('register'); setStep('credentials'); setError('') }}
             style={{ marginTop: 20, width: '100%', color: C.gray, fontSize: 14, textAlign: 'center' }}>
             Нет аккаунта? <span style={{ color: C.orange, fontWeight: 600 }}>Зарегистрироваться</span>
@@ -194,9 +217,23 @@ export default function Auth({ onAuth }: Props) {
     )
   }
 
+  // ─── Онбординг (TG или веб-регистрация) ───────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', padding: '0 24px' }}>
       <div style={{ paddingTop: 60, width: '100%', maxWidth: 420, margin: '0 auto', flex: 1 }}>
+
+        {/* Аватар из TG — показываем только на первом шаге */}
+        {isTelegram && stepIndex === 0 && tgUser?.photo_url && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+            <img
+              src={tgUser.photo_url}
+              alt="avatar"
+              style={{ width: 72, height: 72, borderRadius: 36, border: `3px solid ${C.orange}`, objectFit: 'cover' }}
+            />
+          </div>
+        )}
+
+        {/* Прогресс-бар */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
           {stepIndex > 0 && (
             <button onClick={back} style={{ width: 36, height: 36, borderRadius: 10, background: C.card2, color: C.white, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -214,7 +251,7 @@ export default function Auth({ onAuth }: Props) {
         <div style={{ fontSize: 26, fontWeight: 800, color: C.white, marginBottom: 8 }}>{STEP_TITLES[step]}</div>
         <div style={{ fontSize: 14, color: C.gray, marginBottom: 28 }}>
           {step === 'credentials' && 'Заполните данные для входа'}
-          {step === 'name' && 'Как нам к вам обращаться?'}
+          {step === 'name' && (isTelegram ? 'Можете изменить имя из Telegram' : 'Как нам к вам обращаться?')}
           {step === 'dob' && 'Нужно для расчёта нормы калорий'}
           {step === 'gender' && 'Влияет на расчёт метаболизма'}
           {step === 'body' && 'Нужно для точного расчёта КБЖУ'}
@@ -287,7 +324,7 @@ export default function Auth({ onAuth }: Props) {
           }
         </button>
 
-        {stepIndex === 0 && (
+        {!isTelegram && stepIndex === 0 && (
           <button onClick={() => { setMode('login'); setError('') }}
             style={{ marginTop: 16, width: '100%', color: C.gray, fontSize: 14, textAlign: 'center' }}>
             Уже есть аккаунт? <span style={{ color: C.orange, fontWeight: 600 }}>Войти</span>

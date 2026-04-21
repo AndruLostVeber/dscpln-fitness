@@ -102,12 +102,15 @@ export default function Settings({ user, onBack, onUserUpdate, onLogout }: Props
 
       <div style={{ padding: '0 16px' }}>
         <div style={{ background: C.card, borderRadius: 20, padding: '16px 20px', marginBottom: 16, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 52, height: 52, borderRadius: 26, background: C.orange, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800, color: '#fff' }}>
-            {user.name?.[0]?.toUpperCase() ?? '?'}
-          </div>
+          {user.avatarUrl
+            ? <img src={user.avatarUrl} alt="avatar" style={{ width: 52, height: 52, borderRadius: 26, objectFit: 'cover', border: `2px solid ${C.orange}` }} />
+            : <div style={{ width: 52, height: 52, borderRadius: 26, background: C.orange, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800, color: '#fff' }}>
+                {user.name?.[0]?.toUpperCase() ?? '?'}
+              </div>
+          }
           <div>
             <div style={{ fontSize: 17, fontWeight: 800, color: C.white }}>{user.name}</div>
-            <div style={{ fontSize: 13, color: C.gray }}>{user.email}</div>
+            <div style={{ fontSize: 13, color: C.gray }}>{user.email ?? (user.telegramId ? 'Telegram аккаунт' : '—')}</div>
           </div>
         </div>
 
@@ -134,10 +137,18 @@ export default function Settings({ user, onBack, onUserUpdate, onLogout }: Props
 
         <SectionCard title="Аккаунт">
           <Row label="Имя" value={user.name} onClick={() => setEditing('name')} />
-          <div style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 15, color: C.white }}>Email</span>
-            <span style={{ fontSize: 14, color: C.gray }}>{user.email}</span>
-          </div>
+          {user.email && (
+            <div style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 15, color: C.white }}>Email</span>
+              <span style={{ fontSize: 14, color: C.gray }}>{user.email}</span>
+            </div>
+          )}
+          {user.telegramId && (
+            <div style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 15, color: C.white }}>Telegram</span>
+              <span style={{ fontSize: 14, color: C.gray }}>ID {user.telegramId}</span>
+            </div>
+          )}
         </SectionCard>
 
         <button onClick={onLogout} style={{ width: '100%', marginTop: 8, padding: 16, background: 'rgba(255,71,87,0.1)', color: C.red, border: `1px solid rgba(255,71,87,0.3)`, borderRadius: 16, fontSize: 15, fontWeight: 600 }}>

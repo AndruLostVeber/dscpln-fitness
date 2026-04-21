@@ -60,6 +60,11 @@ export const RefreshSchema = z.object({
 
 export type RefreshInput = z.infer<typeof RefreshSchema>
 
+export const TelegramAuthSchema = z.object({
+  initData: z.string().min(1),
+})
+export type TelegramAuthInput = z.infer<typeof TelegramAuthSchema>
+
 export const UpdateProfileSchema = z.object({
   dateOfBirth: dateOfBirthField.optional(),
   gender: GenderSchema.optional(),

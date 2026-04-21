@@ -37,6 +37,7 @@ export const api = {
     login: (body: object) => request<any>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
     me: () => request<any>('/auth/me'),
     logout: (refreshToken: string) => request<void>('/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken }) }),
+    telegramAuth: (body: { initData: string }) => request<any>('/auth/telegram', { method: 'POST', body: JSON.stringify(body) }),
     updateProfile: (body: object) => request<any>('/auth/profile', { method: 'PUT', body: JSON.stringify(body) }),
   },
   ai: {

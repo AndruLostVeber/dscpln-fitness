@@ -5,6 +5,7 @@ import { authRoutes } from './modules/auth/auth.routes'
 import { aiCoachRoutes } from './modules/ai-coach/ai-coach.routes'
 import { workoutsRoutes } from './modules/workouts/workouts.routes'
 import { connectRedis } from './plugins/redis'
+import { startBot } from './bot/bot'
 
 const app = Fastify({ logger: true })
 
@@ -26,6 +27,7 @@ app.register(workoutsRoutes, { prefix: '/workouts' })
 async function start() {
   await connectRedis()
   await app.listen({ port: Number(process.env.PORT ?? 3000), host: '0.0.0.0' })
+  startBot()
 }
 
 start().catch(err => {

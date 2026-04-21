@@ -7,6 +7,7 @@ import {
   GoogleAuthSchema,
   RefreshSchema,
   UpdateProfileSchema,
+  TelegramAuthSchema,
 } from './auth.schemas'
 
 export async function authRoutes(app: FastifyInstance) {
@@ -19,6 +20,12 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/login', async (request, reply) => {
     const input = LoginSchema.parse(request.body)
     const result = await AuthService.login(input)
+    return reply.code(200).send(result)
+  })
+
+  app.post('/telegram', async (request, reply) => {
+    const { initData } = TelegramAuthSchema.parse(request.body)
+    const result = await AuthService.telegramAuth(initData)
     return reply.code(200).send(result)
   })
 

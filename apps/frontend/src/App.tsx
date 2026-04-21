@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Settings as SettingsIcon } from 'lucide-react'
-import { api, clearTokens } from './api/client'
+import { api, clearTokens, saveTokens } from './api/client'
 import Auth from './pages/Auth'
 import Dashboard from './pages/Dashboard'
 import Food from './pages/Food'
@@ -8,6 +8,28 @@ import WorkoutToday from './pages/WorkoutToday'
 import Settings from './pages/Settings'
 import NutritionLog from './pages/NutritionLog'
 import WorkoutCalendar from './pages/WorkoutCalendar'
+
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp: {
+        initData: string
+        initDataUnsafe: {
+          user?: {
+            id: number
+            first_name: string
+            last_name?: string
+            username?: string
+            photo_url?: string
+          }
+        }
+        ready(): void
+        expand(): void
+        backgroundColor: string
+      }
+    }
+  }
+}
 
 type Page = 'dashboard' | 'food' | 'workout' | 'settings' | 'nutrition' | 'calendar'
 
@@ -23,6 +45,7 @@ interface FoodItem {
 }
 
 const TODAY = new Date().toISOString().split('T')[0]
+const isTelegram = typeof window !== 'undefined' && !!window.Telegram?.WebApp?.initData
 
 function loadEaten(): FoodItem[] {
   try {
@@ -42,10 +65,26 @@ export default function App() {
   const [eaten, setEaten] = useState<FoodItem[]>(loadEaten)
 
   useEffect(() => {
-    api.auth.me()
-      .then(setUser)
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    if (isTelegram) {
+      const twa = window.Telegram!.WebApp
+      twa.ready()
+      twa.expand()
+
+      const initData = twa.initData
+      api.auth.telegramAuth({ initData })
+        .then(res => {
+          saveTokens(res.accessToken, res.refreshToken)
+          return api.auth.me()
+        })
+        .then(setUser)
+        .catch(() => {})
+        .finally(() => setLoading(false))
+    } else {
+      api.auth.me()
+        .then(setUser)
+        .catch(() => {})
+        .finally(() => setLoading(false))
+    }
   }, [])
 
   function addEaten(item: FoodItem) {
@@ -72,12 +111,24 @@ export default function App() {
   }
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f7f8fa' }}>
-      <div style={{ color: '#aaa' }}>Загрузка...</div>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0D0D0F' }}>
+      <div style={{ color: '#8E8EA0', fontSize: 14 }}>Загрузка...</div>
     </div>
   )
 
-  if (!user) return <Auth onAuth={() => api.auth.me().then(setUser)} />
+  // Не авторизован ИЛИ TG-пользователь без профиля → показать Auth
+  const needsOnboarding = !user || (isTelegram && !user.profile)
+  if (needsOnboarding) {
+    const tgUser = isTelegram ? window.Telegram?.WebApp?.initDataUnsafe?.user : undefined
+    return (
+      <Auth
+        onAuth={() => api.auth.me().then(setUser)}
+        isTelegram={isTelegram}
+        tgUser={tgUser}
+        preAuthed={isTelegram && !!user}
+      />
+    )
+  }
 
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', fontFamily: 'system-ui, sans-serif', position: 'relative' }}>
@@ -111,9 +162,11 @@ export default function App() {
           <button onClick={() => setPage('settings')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center' }}>
             <SettingsIcon size={22} color="#8E8EA0" />
           </button>
-          <button onClick={logout} style={{ background: 'none', border: 'none', fontSize: 13, color: '#8E8EA0', cursor: 'pointer', fontFamily: 'inherit' }}>
-            Выйти
-          </button>
+          {!isTelegram && (
+            <button onClick={logout} style={{ background: 'none', border: 'none', fontSize: 13, color: '#8E8EA0', cursor: 'pointer', fontFamily: 'inherit' }}>
+              Выйти
+            </button>
+          )}
         </div>
       )}
     </div>
