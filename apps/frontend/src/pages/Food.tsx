@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft, X, Check, ShoppingCart, ChefHat, Sparkles, RefreshCw, ChevronRight, Flame } from 'lucide-react'
+import { ChevronLeft, X, Check, ShoppingCart, ChefHat, Sparkles, RefreshCw, ChevronRight, Flame, Plus } from 'lucide-react'
 import { api } from '../api/client'
 
 const C = {
@@ -123,12 +123,90 @@ function DishModal({ dish, onClose, onEat }: { dish: FoodItem; onClose: () => vo
   )
 }
 
+function CustomDishModal({ onClose, onAdd }: { onClose: () => void; onAdd: (item: FoodItem) => void }) {
+  const [name, setName] = useState('')
+  const [calories, setCalories] = useState('')
+  const [protein, setProtein] = useState('')
+  const [fat, setFat] = useState('')
+  const [carbs, setCarbs] = useState('')
+  const [err, setErr] = useState('')
+
+  function submit() {
+    if (!name.trim()) { setErr('Введите название'); return }
+    if (!calories || +calories < 0) { setErr('Введите калории'); return }
+    onAdd({
+      name: name.trim(),
+      description: 'Добавлено вручную',
+      calories: +calories || 0,
+      protein: +protein || 0,
+      fat: +fat || 0,
+      carbs: +carbs || 0,
+    })
+    onClose()
+  }
+
+  const numStyle: React.CSSProperties = {
+    flex: 1, background: C.card2, border: `1px solid ${C.border}`,
+    borderRadius: 12, padding: '12px 14px', fontSize: 20, fontWeight: 800,
+    color: C.white, textAlign: 'center' as const, width: '100%',
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }} onClick={onClose}>
+      <div style={{ background: C.card, borderRadius: '24px 24px 0 0', width: '100%', maxWidth: 480, margin: '0 auto', padding: '20px 20px 36px', border: `1px solid ${C.border}` }} onClick={e => e.stopPropagation()}>
+        <div style={{ width: 40, height: 4, background: C.border, borderRadius: 2, margin: '0 auto 20px' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: C.white }}>Своё блюдо</div>
+          <button onClick={onClose} style={{ color: C.gray, display: 'flex', alignItems: 'center' }}><X size={22} /></button>
+        </div>
+
+        {/* Название */}
+        <input
+          placeholder="Название блюда"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          style={{ width: '100%', background: C.card2, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px 16px', fontSize: 16, color: C.white, marginBottom: 16 }}
+        />
+
+        {/* КБЖУ */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+          {[
+            { label: 'Калории', unit: 'ккал', val: calories, set: setCalories, color: C.orange },
+            { label: 'Белки', unit: 'г', val: protein, set: setProtein, color: '#FF6B6B' },
+            { label: 'Жиры', unit: 'г', val: fat, set: setFat, color: '#FFA94D' },
+            { label: 'Углеводы', unit: 'г', val: carbs, set: setCarbs, color: C.green },
+          ].map(f => (
+            <div key={f.label} style={{ background: C.card2, borderRadius: 16, padding: '12px 14px', border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: 10, color: C.gray, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{f.label}</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                <input
+                  type="number" placeholder="0" value={f.val}
+                  onChange={e => f.set(e.target.value)}
+                  style={{ ...numStyle, color: f.color, padding: 0, border: 'none', background: 'none', borderRadius: 0 }}
+                />
+                <span style={{ fontSize: 12, color: C.gray }}>{f.unit}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {err && <div style={{ color: C.red, fontSize: 13, marginBottom: 10, textAlign: 'center' }}>{err}</div>}
+
+        <button onClick={submit} style={{ width: '100%', padding: '16px', background: C.orange, color: '#fff', borderRadius: 16, fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <Check size={18} /> Добавить в рацион
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Food({ user, eaten, onEat, onRemove, onBack }: Props) {
   const [want, setWant] = useState('')
   const [suggestions, setSuggestions] = useState<FoodItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [selectedDish, setSelectedDish] = useState<FoodItem | null>(null)
+  const [showCustom, setShowCustom] = useState(false)
 
   const macros = user.profile ? calcTDEE(user.profile) : null
   const consumed = eaten.reduce((acc, f) => ({ cal: acc.cal + f.calories, p: acc.p + f.protein, f: acc.f + f.fat, c: acc.c + f.carbs }), { cal: 0, p: 0, f: 0, c: 0 })
@@ -151,7 +229,10 @@ export default function Food({ user, eaten, onEat, onRemove, onBack }: Props) {
         <button onClick={onBack} style={{ width: 36, height: 36, borderRadius: 10, background: C.card2, color: C.white, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <ChevronLeft size={20} />
         </button>
-        <div style={{ fontSize: 20, fontWeight: 800, color: C.white }}>Питание</div>
+        <div style={{ fontSize: 20, fontWeight: 800, color: C.white, flex: 1 }}>Питание</div>
+        <button onClick={() => setShowCustom(true)} style={{ width: 36, height: 36, borderRadius: 10, background: C.orange, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Plus size={20} />
+        </button>
       </div>
 
       <div style={{ padding: '0 16px' }}>
@@ -249,6 +330,9 @@ export default function Food({ user, eaten, onEat, onRemove, onBack }: Props) {
       {selectedDish && (
         <DishModal dish={selectedDish} onClose={() => setSelectedDish(null)}
           onEat={() => { onEat(selectedDish); setSuggestions(prev => prev.filter(s => s.name !== selectedDish.name)) }} />
+      )}
+      {showCustom && (
+        <CustomDishModal onClose={() => setShowCustom(false)} onAdd={item => { onEat(item); setShowCustom(false) }} />
       )}
     </div>
   )

@@ -4,6 +4,39 @@ import type { FoodSuggestionsInput, WorkoutSuggestionsInput, MotivationInput } f
 
 const HISTORY_LIMIT = 20
 
+/** Вырезает JSON между первым { и последним }, чинит обрезанные массивы */
+function safeParseJson<T>(raw: string, fallback: T): T {
+  const cleaned = raw.replace(/```json|```/g, '').trim()
+  // Найти первый { и последний }
+  const start = cleaned.indexOf('{')
+  const end = cleaned.lastIndexOf('}')
+  if (start === -1 || end === -1) return fallback
+  try {
+    return JSON.parse(cleaned.slice(start, end + 1))
+  } catch {
+    // Если JSON оборван — попробовать закрыть незакрытые скобки
+    let partial = cleaned.slice(start, end + 1)
+    // Считаем незакрытые [ и {
+    let openBrackets = 0; let openBraces = 0
+    let inStr = false; let escape = false
+    for (const ch of partial) {
+      if (escape) { escape = false; continue }
+      if (ch === '\\') { escape = true; continue }
+      if (ch === '"') { inStr = !inStr; continue }
+      if (inStr) continue
+      if (ch === '[') openBrackets++
+      else if (ch === ']') openBrackets--
+      else if (ch === '{') openBraces++
+      else if (ch === '}') openBraces--
+    }
+    // Обрезать по последней полной запятой в верхнем массиве чтобы не оставлять незакрытый объект
+    const lastComma = partial.lastIndexOf('},')
+    if (lastComma !== -1) partial = partial.slice(0, lastComma + 1)
+    partial += ']'.repeat(Math.max(0, openBrackets)) + '}'.repeat(Math.max(0, openBraces))
+    try { return JSON.parse(partial) } catch { return fallback }
+  }
+}
+
 function buildSystemPrompt(profile: {
   name: string
   motivationStyle: string
@@ -217,21 +250,22 @@ ${notes ? `- Пожелания: ${notes}` : ''}
       ? `Сегодня уже съел: ${input.eatenItems.join(', ')}.`
       : 'Сегодня ещё ничего не ел.'
 
-    const prompt = `3 блюда с "${input.want}". ${eatenLine} КБЖУ: ${Math.round(input.remainingCalories)}ккал Б${Math.round(input.remainingProtein)} Ж${Math.round(input.remainingFat)} У${Math.round(input.remainingCarbs)}. Цель: ${user.profile.goal}.
-JSON:{"suggestions":[{"name":"...","description":"1 предложение","calories":0,"protein":0,"fat":0,"carbs":0,"ingredients":["кол-во ингредиент (пояснение)"],"recipe":["Шаг (X мин): детальные действия"]}]}`
+    const prompt = `2 блюда с "${input.want}". ${eatenLine} КБЖУ: ${Math.round(input.remainingCalories)}ккал Б${Math.round(input.remainingProtein)} Ж${Math.round(input.remainingFat)} У${Math.round(input.remainingCarbs)}. Цель: ${user.profile.goal}.
+Ответь ТОЛЬКО валидным JSON без markdown:
+{"suggestions":[{"name":"...","description":"1 предложение","calories":0,"protein":0,"fat":0,"carbs":0,"ingredients":["200г ингредиент"],"recipe":["Шаг 1 (5 мин): действие","Шаг 2 (10 мин): действие"]}]}`
 
     const completion = await nvidia.chat.completions.create({
       model: NVIDIA_MODELS.fast,
       messages: [
-        { role: 'system', content: 'Ты диетолог. Отвечай только валидным JSON.' },
+        { role: 'system', content: 'Ты диетолог. Отвечай ТОЛЬКО валидным JSON, без текста до или после.' },
         { role: 'user', content: prompt },
       ],
       temperature: 0.5,
-      max_tokens: 2500,
+      max_tokens: 4096,
     })
 
     const raw = completion.choices[0].message.content ?? '{}'
-    return JSON.parse(raw.replace(/```json|```/g, '').trim())
+    return safeParseJson(raw, { suggestions: [] })
   },
 
   async getWorkoutSuggestions(userId: string, input: WorkoutSuggestionsInput): Promise<object> {
@@ -241,20 +275,21 @@ JSON:{"suggestions":[{"name":"...","description":"1 предложение","cal
     const exCount = input.exerciseCount ?? 5
     const sets = input.setsPerExercise ?? 3
 
-    const prompt = `2 варианта тренировки. Мышцы: ${input.focus}. Уровень: ${user.profile.fitnessLevel}, цель: ${user.profile.goal}. Травмы: ${user.profile.injuries.join(', ') || 'нет'}. Ровно ${exCount} упражнений, ${sets} подходов в каждом. JSON без markdown:
+    const prompt = `2 варианта тренировки. Мышцы: ${input.focus}. Уровень: ${user.profile.fitnessLevel}, цель: ${user.profile.goal}. Травмы: ${user.profile.injuries.join(', ') || 'нет'}. Ровно ${exCount} упражнений, ${sets} подходов в каждом.
+Ответь ТОЛЬКО валидным JSON без markdown:
 {"workouts":[{"title":"...","duration":"X мин","difficulty":"...","exercises":[{"name":"...","sets":${sets},"reps":"10-12"}]}]}`
 
     const completion = await nvidia.chat.completions.create({
       model: NVIDIA_MODELS.fast,
       messages: [
-        { role: 'system', content: 'Ты опытный фитнес-тренер. Отвечай только валидным JSON.' },
+        { role: 'system', content: 'Ты опытный фитнес-тренер. Отвечай ТОЛЬКО валидным JSON, без текста до или после.' },
         { role: 'user', content: prompt },
       ],
       temperature: 0.5,
-      max_tokens: 1500,
+      max_tokens: 2048,
     })
 
     const raw = completion.choices[0].message.content ?? '{}'
-    return JSON.parse(raw.replace(/```json|```/g, '').trim())
+    return safeParseJson(raw, { workouts: [] })
   },
 }
